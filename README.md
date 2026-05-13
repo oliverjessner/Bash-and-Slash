@@ -1,1 +1,3 @@
-# The Final Console.log
+# Bash & Slash
+
+![](/assets/logo.webp)

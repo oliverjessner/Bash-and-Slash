@@ -3,15 +3,17 @@ import base from './base.js';
 export default class golem extends base {
     constructor(obj) {
         super({
-            hp: 120,
+            ...obj,
+            hp: 110,
             atk: 0,
             def: 20,
             int: 40,
             ddef: 10,
-            mana: 200,
+            mana: 260,
             luck: 1,
             range: 4,
             ...obj,
+            job: 'Golem' + (obj.job || ''),
         });
     }
 
@@ -36,7 +38,7 @@ export default class golem extends base {
         });
     }
 
-    shard(msg, amount, damage, extraMana = 10) {
+    shards(msg, amount, damage, extraMana = 10) {
         const attacks = [];
 
         for (let i = 0; i < amount; i++) {

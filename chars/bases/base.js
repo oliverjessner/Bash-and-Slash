@@ -11,8 +11,8 @@ export default class base {
     _baseDef = 0;
     _int = 0;
     _baseInt = 0;
-    _dakt = 0;
-    _baseDakt = 0;
+    _datk = 0;
+    _baseDatk = 0;
     _ddef = 0;
     _baseDdef = 0;
     _mana = 0;
@@ -21,23 +21,25 @@ export default class base {
     _range = 0;
     _skills = [];
     _status = ['healthy'];
-    static minManaUsage = 20;
+    _job = '';
     #usedLuck = 0;
+    static minManaUsage = 20;
     static #id = 0;
 
     constructor({
         nickname = '',
         name,
-        hp,
+        hp = 100,
         atk = 20,
         def = 10,
         int = 60,
-        dakt = 0,
+        datk = 0,
         ddef = 10,
         mana = 0,
         luck = 1,
         range = 1,
         skills = [],
+        job = 'Warrior',
     }) {
         base.#id++;
         this._nickname = nickname || `${name}_${base.#id}`;
@@ -50,8 +52,8 @@ export default class base {
         this._baseDef = def;
         this._int = int;
         this._baseInt = int;
-        this._dakt = dakt;
-        this._baseDakt = dakt;
+        this._datk = datk;
+        this._baseDatk = datk;
         this._ddef = ddef;
         this._baseDdef = ddef;
         this._mana = mana;
@@ -59,11 +61,16 @@ export default class base {
         this._luck = luck;
         this._range = range;
         this._skills = skills;
+        this._job = job;
         this.check();
     }
 
+    getJob() {
+        return this._job;
+    }
+
     check() {
-        const base = this._hp + this._atk + this._def + this._int + this._dakt + this._ddef + this._mana;
+        const base = this._hp + this._atk + this._def + this._int + this._datk + this._ddef + this._mana;
         const secBase = this._luck + this._range;
 
         if (secBase > 5) {
@@ -130,7 +137,7 @@ export default class base {
     }
 
     darkAttack(alternativeMsg = 'Dark attack!') {
-        return this.attack(alternativeMsg, '_dakt');
+        return this.attack(alternativeMsg, '_datk');
     }
 
     attack(alternativeMsg = 'Attack', damageType = '_atk') {
@@ -273,9 +280,9 @@ export default class base {
     }
 
     activateStatusOnChar() {
-        if (this._status.includes('healthy') || this._status.includes('invulnerable')) {
+        if (this._status.includes('invulnerable')) {
             return this.welformAction({
-                msg: `${this._name} is healthy.`,
+                msg: `${this._name} is invulnerable.`,
                 emoji: '🧬',
                 status: this._status,
                 valid: true,
@@ -295,11 +302,11 @@ export default class base {
             if (element === 'frozen' && this._int > this._baseInt / 2) {
                 this._int = this._int / 2;
             }
-            if (element === 'burned' && this._def > this._baseDeff - this._baseDef / 3) {
-                this._def = this._def - this._def / 3;
+            if (element === 'burned' && this._def > this._baseDef - this._baseDef / 3) {
+                this._def = Math.floor(this._def - this._def / 3);
             }
             if (element === 'entangled' && this._atk > this._baseAtk - this._baseAtk / 4) {
-                this._atk = this._atk - this._atk / 4;
+                this._atk = Math.floor(this._atk - this._atk / 4);
             }
         });
 
@@ -435,7 +442,7 @@ export default class base {
     }
 
     toString() {
-        const BASE = this._fullHP + this._atk + this._def + this._int + this._dakt + this._ddef + this._mana;
+        const BASE = this._fullHP + this._atk + this._def + this._int + this._datk + this._ddef + this._mana;
 
         return {
             name: this._name,
@@ -448,8 +455,8 @@ export default class base {
             baseDef: this._baseDef,
             INT: this._int,
             baseInt: this._baseInt,
-            DAKT: this._dakt,
-            baseDakt: this._baseDakt,
+            DATK: this._datk,
+            baseDATK: this._baseDatk,
             DDEF: this._ddef,
             baseDdef: this._baseDdef,
             MANA: this._mana,

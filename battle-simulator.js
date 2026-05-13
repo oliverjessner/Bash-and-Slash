@@ -1,20 +1,81 @@
 import readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 import { pathToFileURL } from 'node:url';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 
 import chalk from 'chalk';
 
 import Base from './chars/bases/base.js';
-import classNames from './chars/classesdata.js';
+import classesData from './chars/classesdata.js';
 
 const PLAYER = 'player';
 const ENEMY = 'enemy';
 const DEFAULT_MIN_MANA_USAGE = 20;
 const NAME_COLUMN_WIDTH = 28;
-const VALUE_COLUMN_WIDTH = 12;
+const VALUE_COLUMN_WIDTH = 10;
 const COMPACT_VALUE_COLUMN_WIDTH = 7;
 
 const classConstructors = new Map();
+const characterJobCache = new Map();
+const characterEntries = classesData.map(normalizeCharacterEntry);
+const execFileAsync = promisify(execFile);
+
+function normalizeCharacterEntry(entry) {
+    if (typeof entry === 'string') {
+        return {
+            name: entry,
+            type: 'classes',
+        };
+    }
+
+    return {
+        name: entry.name,
+        type: entry.type ?? 'classes',
+    };
+}
+
+function validateCharacterEntry(entry) {
+    if (!entry?.name || !entry?.type) {
+        throw new Error('Character entry must have name and type.');
+    }
+
+    if (!/^[a-z0-9_-]+$/i.test(entry.name) || !/^[a-z0-9_-]+$/i.test(entry.type)) {
+        throw new Error(`Invalid character entry: ${entry.type}/${entry.name}`);
+    }
+}
+
+function characterKey(entry) {
+    return `${entry.type}/${entry.name}`;
+}
+
+async function characterJob(entry) {
+    validateCharacterEntry(entry);
+
+    const key = characterKey(entry);
+
+    if (!characterJobCache.has(key)) {
+        try {
+            const script = `
+                const type = ${JSON.stringify(entry.type)};
+                const name = ${JSON.stringify(entry.name)};
+                const module = await import(\`./chars/\${type}/\${name}.js\`);
+                const char = new module.default();
+                const job = typeof char.getJob === 'function' ? char.getJob() : char._job ?? '';
+                process.stdout.write(String(job));
+            `;
+            const { stdout } = await execFileAsync(process.execPath, ['--input-type=module', '-e', script], {
+                cwd: new URL('.', import.meta.url),
+            });
+
+            characterJobCache.set(key, stdout.trim() || 'unknown');
+        } catch {
+            characterJobCache.set(key, 'unknown');
+        }
+    }
+
+    return characterJobCache.get(key);
+}
 
 function sideColor(unit) {
     return unit.side === PLAYER ? chalk.green : chalk.red;
@@ -30,23 +91,27 @@ function clearScreen() {
     }
 }
 
-async function loadClassConstructor(className) {
-    if (!classConstructors.has(className)) {
-        const classUrl = new URL(`./chars/classes/${className}.js`, import.meta.url);
+async function loadClassConstructor(characterEntry) {
+    validateCharacterEntry(characterEntry);
+
+    const key = characterKey(characterEntry);
+
+    if (!classConstructors.has(key)) {
+        const classUrl = new URL(`./chars/${characterEntry.type}/${characterEntry.name}.js`, import.meta.url);
         const classModule = await import(classUrl.href);
 
         if (typeof classModule.default !== 'function') {
-            throw new Error(`Class file for ${className} does not export a constructor.`);
+            throw new Error(`Character file for ${key} does not export a constructor.`);
         }
 
-        classConstructors.set(className, classModule.default);
+        classConstructors.set(key, classModule.default);
     }
 
-    return classConstructors.get(className);
+    return classConstructors.get(key);
 }
 
-async function createUnit(className, side, index) {
-    const ClassConstructor = await loadClassConstructor(className);
+async function createUnit(characterEntry, side, index) {
+    const ClassConstructor = await loadClassConstructor(characterEntry);
     const char = new ClassConstructor();
 
     // The current class methods read minManaUsage from the instance.
@@ -58,7 +123,8 @@ async function createUnit(className, side, index) {
     return {
         id: `${side === PLAYER ? 'P' : 'E'}${index}`,
         side,
-        className,
+        className: characterEntry.name,
+        type: characterEntry.type,
         char,
     };
 }
@@ -230,19 +296,25 @@ function formatUnitShort(unit) {
     return `${formatUnitName(unit, { padded: false })} ${formatUnitStats(unit, { includeMana: false, includeInt: false, separator: ' ' })}`;
 }
 
-function printClassList() {
+async function printClassList() {
     console.log(`\n${formatHeading('Verfuegbare Klassen:')}`);
-    classNames.forEach((className, index) => {
-        console.log(`  ${chalk.gray(String(index + 1).padStart(2, ' '))}. ${chalk.bold(className)}`);
-    });
+
+    for (const [index, entry] of characterEntries.entries()) {
+        const job = await characterJob(entry);
+        console.log(
+            `  ${chalk.gray(String(index + 1).padStart(2, ' '))}. ${chalk.bold(entry.name)} ${chalk.gray(`(${job})`)}`,
+        );
+    }
 }
 
 function printTeam(title, units) {
     console.log(formatHeading(title));
 
-    units.forEach(unit => {
-        console.log(`  ${formatUnitLine(unit)}`);
-    });
+    [...units]
+        .sort((left, right) => unitInt(right) - unitInt(left))
+        .forEach(unit => {
+            console.log(`  ${formatUnitLine(unit)}`);
+        });
 }
 
 function formatTurnOrderSummary(roundOrder) {
@@ -313,14 +385,20 @@ async function askClassName(rl, question) {
         const answer = (await rl.question(question)).trim().toLowerCase();
         const index = Number.parseInt(answer, 10);
 
-        if (Number.isInteger(index) && index >= 1 && index <= classNames.length) {
-            return classNames[index - 1];
+        if (Number.isInteger(index) && index >= 1 && index <= characterEntries.length) {
+            return characterEntries[index - 1];
         }
 
-        const byName = classNames.find(className => className.toLowerCase() === answer);
+        const byName = characterEntries.find(entry => entry.name.toLowerCase() === answer);
 
         if (byName) {
             return byName;
+        }
+
+        const byPath = characterEntries.find(entry => `${entry.type}/${entry.name}`.toLowerCase() === answer);
+
+        if (byPath) {
+            return byPath;
         }
 
         console.log('Ungueltige Klasse. Bitte Index oder Namen aus der Liste verwenden.');
@@ -333,9 +411,9 @@ async function chooseUnits(rl, side) {
     const units = [];
 
     for (let index = 1; index <= amount; index++) {
-        printClassList();
-        const className = await askClassName(rl, `${label} Einheit ${index}: Klasse waehlen: `);
-        units.push(await createUnit(className, side, index));
+        await printClassList();
+        const characterEntry = await askClassName(rl, `${label} Einheit ${index}: Klasse waehlen: `);
+        units.push(await createUnit(characterEntry, side, index));
     }
 
     return units;
@@ -427,7 +505,7 @@ function printUnitInfo(unit) {
     console.log(`\n${formatHeading(`Info fuer ${safeName(unit)}`)}`);
     console.log(`  ${formatUnitLine(unit)}`);
     console.log(
-        `  Dark ATK ${formatNumber(Number(safeToString(unit).DAKT ?? unit.char?._dakt))} | Dark DEF ${formatNumber(Number(safeToString(unit).DDEF ?? unit.char?._ddef))} | Luck ${formatNumber(Number(safeToString(unit).LUCK ?? unit.char?._luck))} | Range ${formatNumber(Number(safeToString(unit).RANGE ?? unit.char?._range))}`,
+        `  Dark ATK ${formatNumber(Number(safeToString(unit).DATK ?? unit.char?._datk))} | Dark DEF ${formatNumber(Number(safeToString(unit).DDEF ?? unit.char?._ddef))} | Luck ${formatNumber(Number(safeToString(unit).LUCK ?? unit.char?._luck))} | Range ${formatNumber(Number(safeToString(unit).RANGE ?? unit.char?._range))}`,
     );
 
     if (skillInfo.skills.length === 0) {
@@ -1082,16 +1160,16 @@ function winner(teams) {
     return 'draw';
 }
 
-function printWinner(result) {
+function printWinner(result, round) {
     console.log(`\n${formatHeading('===== Ergebnis =====')}`);
 
     if (result === PLAYER) {
         console.log(
-            chalk.green.bold(`Der Spieler gewinnt. Alle gegnerischen Einheiten sind nach ${viewState.round} besiegt.`),
+            chalk.green.bold(`Der Spieler gewinnt. Alle gegnerischen Einheiten sind nach ${round - 1} besiegt.`),
         );
     } else if (result === ENEMY) {
         console.log(
-            chalk.red.bold(`Der Spieler verliert. Alle eigenen Einheiten sind nach ${viewState.round} runden besiegt.`),
+            chalk.red.bold(`Der Spieler verliert. Alle eigenen Einheiten sind nach ${round - 1} runden besiegt.`),
         );
     } else {
         console.log(chalk.yellow.bold('Unentschieden. Beide Seiten wurden besiegt.'));
@@ -1160,14 +1238,14 @@ async function runBattle(rl, teams) {
         round++;
     }
 
-    printWinner(winner(teams), viewState);
+    printWinner(winner(teams), round);
 }
 
 export async function runBattleSimulator() {
     const rl = readline.createInterface({ input, output });
 
     try {
-        printClassList();
+        await printClassList();
 
         const teams = {
             player: await chooseUnits(rl, PLAYER),

@@ -17,6 +17,6 @@ export default class firegolem extends golem {
     }
 
     fireShards() {
-        return this.shards('Ice shards! Target takes 3x 20 damage.', 3, 30, 20);
+        return this.shards('Ice shards! Target takes 3x 30 damage.', 3, 30, 20);
     }
 }

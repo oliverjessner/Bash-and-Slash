@@ -1,10 +1,11 @@
 import base from './base.js';
 
 export default class buffer extends base {
-    buffAmount = 5;
-
     constructor(obj) {
-        super(obj);
+        super({
+            ...obj,
+            job: 'Buffer' + (obj.job || ''),
+        });
     }
 
     debuff({ type, amount = 5 }) {
@@ -20,8 +21,8 @@ export default class buffer extends base {
         }
 
         return this.welformAction({
-            msg: `${type} debuff! ${this.buffAmount} .`,
-            buff: { type, amount: this.buffAmount },
+            msg: `${type} debuff! ${amount} .`,
+            buff: { type, amount },
             emoji: '🧙🏻‍♀️',
             mana: this._mana,
             triggers: 'debuff',

@@ -19,6 +19,6 @@ export default class plantgolem extends golem {
     }
 
     plantShards() {
-        return this.shards('Plant shards! Target takes 3x 20 damage.', 5, 25);
+        return this.shards('Plant shards! Target takes 5x 25 damage.', 5, 25);
     }
 }

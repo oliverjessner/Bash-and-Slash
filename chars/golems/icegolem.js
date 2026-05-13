@@ -6,7 +6,7 @@ export default class icegolem extends golem {
             name: 'icegolem',
             hp: 125,
             int: 35,
-            skills: ['icebreath', 'iceShards', 'snowball'],
+            skills: ['iceBreath', 'iceShards', 'snowball'],
         });
     }
 
@@ -15,10 +15,10 @@ export default class icegolem extends golem {
     }
 
     snowball() {
-        return this.ball('Snowball! Target takes 40 damage.', 2, 35, 15);
+        return this.ball('Snowball! Target takes 40 damage.');
     }
 
     iceShards() {
-        return this.shards('Ice shards! Target takes 3x 20 damage.');
+        return this.shards('Ice shards! Target takes 2x 35 damage.', 2, 35, 15);
     }
 }

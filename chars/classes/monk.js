@@ -11,7 +11,7 @@ export default class monk extends healer {
             ddef: 20,
             mana: 80,
             luck: 1,
-            skills: ['heal'],
+            skills: [],
         });
     }
 }

@@ -42,8 +42,8 @@ export default class buffer extends base {
         }
 
         return this.welformAction({
-            msg: `${type} buff! ${this.buffAmount} .`,
-            buff: { type, amount: this.buffAmount, selfBuf },
+            msg: `${type} buff! ${amount} .`,
+            buff: { type, amount, selfBuf },
             emoji: '🪄',
             mana: this._mana,
             triggers: 'buff',

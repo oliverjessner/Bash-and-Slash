@@ -133,11 +133,11 @@ export default class base {
         return this.attack(alternativeMsg, '_dakt');
     }
 
-    attack(alternativeMsg = 'Normal hit.', damageType = '_atk') {
+    attack(alternativeMsg = 'Attack', damageType = '_atk') {
         if (this.#enoughLuck()) {
             return [
                 this.welformAction({
-                    msg: `${alternativeMsg} - Critical hit! - ${this[damageType]}`,
+                    msg: `${alternativeMsg} - Critical hit! - Damage: ${this[damageType] * 2}`,
                     emoji: '⚔️',
                     damage: this[damageType] * 2,
                     triggers: 'calcDamage',
@@ -148,7 +148,7 @@ export default class base {
 
         return [
             this.welformAction({
-                msg: alternativeMsg + ` - ${this[damageType]}`,
+                msg: alternativeMsg + ` - Damage: ${this[damageType]}`,
                 emoji: '⚔️',
                 damage: this[damageType],
                 triggers: 'calcDamage',
@@ -161,10 +161,10 @@ export default class base {
         return this.defend(alternativeMsg, '_ddef');
     }
 
-    defend(alternativeMsg = 'Normal defense.', damageType = '_def') {
+    defend(alternativeMsg = 'Defense.', damageType = '_def') {
         if (this.#enoughLuck()) {
             return this.welformAction({
-                msg: `${alternativeMsg} Critical defense!`,
+                msg: `${alternativeMsg} Critical defense! - Defense: ${this[damageType] * 2}`,
                 emoji: '🛡️',
                 damage: this[damageType] * 2,
                 triggers: 'calcDamage',
@@ -173,7 +173,7 @@ export default class base {
         }
 
         return this.welformAction({
-            msg: alternativeMsg,
+            msg: alternativeMsg + ` - Defense:  ${this[damageType]}`,
             emoji: '🛡️',
             damage: this[damageType],
             triggers: 'calcDamage',

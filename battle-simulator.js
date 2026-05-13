@@ -11,7 +11,8 @@ const PLAYER = 'player';
 const ENEMY = 'enemy';
 const DEFAULT_MIN_MANA_USAGE = 20;
 const NAME_COLUMN_WIDTH = 28;
-const VALUE_COLUMN_WIDTH = 13;
+const VALUE_COLUMN_WIDTH = 12;
+const COMPACT_VALUE_COLUMN_WIDTH = 7;
 
 const classConstructors = new Map();
 
@@ -151,6 +152,13 @@ function unitInt(unit) {
     return Number.isFinite(intValue) ? intValue : 0;
 }
 
+function unitLuck(unit) {
+    const data = safeToString(unit);
+    const luck = Number(data.LUCK ?? data.luck ?? unit.char?._luck);
+
+    return Number.isFinite(luck) ? luck : 0;
+}
+
 function unitStatus(unit) {
     const rawStatus = unit.char?._status ?? safeToString(unit).status ?? [];
     const statuses = Array.isArray(rawStatus) ? rawStatus : [rawStatus];
@@ -169,8 +177,8 @@ function formatUnitName(unit, { padded = true } = {}) {
     return isAlive(unit) ? sideColor(unit)(text) : chalk.gray(text);
 }
 
-function formatStatCell(label, value, color = text => text) {
-    return color(`${label} ${value}`.padEnd(VALUE_COLUMN_WIDTH, ' '));
+function formatStatCell(label, value, color = text => text, width = VALUE_COLUMN_WIDTH) {
+    return color(`${label} ${value}`.padEnd(width, ' '));
 }
 
 function statusColor(status) {
@@ -187,27 +195,29 @@ function statusColor(status) {
 
 function formatUnitStats(unit, { includeMana = true, includeInt = true, separator = ' | ' } = {}) {
     const status = unitStatus(unit);
-    const cells = [
-        formatStatCell('HP', unitHp(unit), chalk.bold),
-    ];
+    const cells = [formatStatCell('HP', unitHp(unit), chalk.bold)];
 
     if (includeMana) {
         cells.push(formatStatCell('Mana', unitMana(unit), chalk.blue));
     }
 
     cells.push(
-        formatStatCell('ATK', formatNumber(unitAtk(unit))),
-        formatStatCell('DEF', formatNumber(unitDef(unit))),
+        formatStatCell('ATK', formatNumber(unitAtk(unit)), text => text, COMPACT_VALUE_COLUMN_WIDTH),
+        formatStatCell('DEF', formatNumber(unitDef(unit)), text => text, COMPACT_VALUE_COLUMN_WIDTH),
     );
 
     if (includeInt) {
-        cells.push(formatStatCell('INT', formatNumber(unitInt(unit))));
+        cells.push(formatStatCell('INT', formatNumber(unitInt(unit)), text => text, COMPACT_VALUE_COLUMN_WIDTH));
     }
 
-    cells.push(formatStatCell('Status', status, text => {
-        const plain = `Status ${status}`.padEnd(VALUE_COLUMN_WIDTH, ' ');
-        return statusColor(status)(plain);
-    }));
+    cells.push(formatStatCell('LUCK', formatNumber(unitLuck(unit)), text => text, COMPACT_VALUE_COLUMN_WIDTH));
+
+    cells.push(
+        formatStatCell('Status', status, text => {
+            const plain = `Status ${status}`.padEnd(VALUE_COLUMN_WIDTH, ' ');
+            return statusColor(status)(plain);
+        }),
+    );
 
     return cells.join(separator);
 }
@@ -241,7 +251,7 @@ function formatTurnOrderSummary(roundOrder) {
 
 function printRoundOrder(roundOrder) {
     console.log(formatHeading('Zugreihenfolge:'));
-    console.log(`  ${chalk.hex('#f59e0b')('1.')} ${formatTurnOrderSummary(roundOrder)}`);
+    console.log(`  ${formatTurnOrderSummary(roundOrder)}`);
 }
 
 function printBattleState(round, teams, roundOrder) {
@@ -335,9 +345,10 @@ function safeSkills(unit) {
     try {
         const skillInfo = typeof unit.char.getSkills === 'function' ? unit.char.getSkills() : {};
         const skills = Array.isArray(skillInfo.skills) ? skillInfo.skills.filter(Boolean) : [];
-        const isAbleToUseSkill = typeof unit.char.isAbleToUseSkill === 'function'
-            ? unit.char.isAbleToUseSkill()
-            : Boolean(skillInfo.isAbleToUseSkill);
+        const isAbleToUseSkill =
+            typeof unit.char.isAbleToUseSkill === 'function'
+                ? unit.char.isAbleToUseSkill()
+                : Boolean(skillInfo.isAbleToUseSkill);
 
         return {
             skills,
@@ -361,7 +372,11 @@ function resolveSkillMethod(char, skillName) {
 
     while (proto && proto !== Object.prototype) {
         for (const property of Object.getOwnPropertyNames(proto)) {
-            if (property !== 'constructor' && property.toLowerCase() === normalized && typeof char[property] === 'function') {
+            if (
+                property !== 'constructor' &&
+                property.toLowerCase() === normalized &&
+                typeof char[property] === 'function'
+            ) {
                 return property;
             }
         }
@@ -387,12 +402,7 @@ function inferTargetScope(unit, kind, skillName) {
         return 'enemy';
     }
 
-    if (
-        skill.includes('heal') ||
-        skill.includes('buff') ||
-        skill === 'vitality' ||
-        skill === 'invulnerability'
-    ) {
+    if (skill.includes('heal') || skill.includes('buff') || skill === 'vitality' || skill === 'invulnerability') {
         return 'ally';
     }
 
@@ -416,7 +426,9 @@ function printUnitInfo(unit) {
 
     console.log(`\n${formatHeading(`Info fuer ${safeName(unit)}`)}`);
     console.log(`  ${formatUnitLine(unit)}`);
-    console.log(`  Dark ATK ${formatNumber(Number(safeToString(unit).DAKT ?? unit.char?._dakt))} | Dark DEF ${formatNumber(Number(safeToString(unit).DDEF ?? unit.char?._ddef))} | Luck ${formatNumber(Number(safeToString(unit).LUCK ?? unit.char?._luck))} | Range ${formatNumber(Number(safeToString(unit).RANGE ?? unit.char?._range))}`);
+    console.log(
+        `  Dark ATK ${formatNumber(Number(safeToString(unit).DAKT ?? unit.char?._dakt))} | Dark DEF ${formatNumber(Number(safeToString(unit).DDEF ?? unit.char?._ddef))} | Luck ${formatNumber(Number(safeToString(unit).LUCK ?? unit.char?._luck))} | Range ${formatNumber(Number(safeToString(unit).RANGE ?? unit.char?._range))}`,
+    );
 
     if (skillInfo.skills.length === 0) {
         console.log(chalk.gray('  Keine Skills verfuegbar.'));
@@ -543,7 +555,13 @@ async function askPlayerAction(rl, teams, unit, sequence, viewState) {
             break;
         }
 
-        if (answer === '2' || answer === 'dark' || answer === 'darkattack' || answer === 'dark attack' || answer === 'd') {
+        if (
+            answer === '2' ||
+            answer === 'dark' ||
+            answer === 'darkattack' ||
+            answer === 'dark attack' ||
+            answer === 'd'
+        ) {
             kind = 'darkAttack';
             break;
         }
@@ -558,7 +576,11 @@ async function askPlayerAction(rl, teams, unit, sequence, viewState) {
             break;
         }
 
-        console.log(hasSkills ? '  Ungueltige Aktion. Bitte attack, dark attack, skill oder info waehlen.' : '  Ungueltige Aktion. Bitte attack, dark attack oder info waehlen.');
+        console.log(
+            hasSkills
+                ? '  Ungueltige Aktion. Bitte attack, dark attack, skill oder info waehlen.'
+                : '  Ungueltige Aktion. Bitte attack, dark attack oder info waehlen.',
+        );
     }
 
     let skillName = null;
@@ -754,7 +776,11 @@ function messageEmoji(action) {
         return '⚠️';
     }
 
-    if (String(action?.msg ?? '').toLowerCase().includes('defeated')) {
+    if (
+        String(action?.msg ?? '')
+            .toLowerCase()
+            .includes('defeated')
+    ) {
         return '💀';
     }
 
@@ -782,11 +808,12 @@ function messageEmoji(action) {
 function printActionMessage(action, prefix = '  ') {
     if (action?.msg) {
         const formattedMsg = `${messageEmoji(action)} ${action.msg}`;
-        const message = action.valid === false
-            ? chalk.yellow(formattedMsg)
-            : String(action.msg).toLowerCase().includes('defeated')
-                ? chalk.red.bold(formattedMsg)
-                : chalk.white(formattedMsg);
+        const message =
+            action.valid === false
+                ? chalk.yellow(formattedMsg)
+                : String(action.msg).toLowerCase().includes('defeated')
+                  ? chalk.red.bold(formattedMsg)
+                  : chalk.white(formattedMsg);
 
         console.log(`${prefix}${message}`);
     }
@@ -850,12 +877,12 @@ function executeRawAction(action, plan, teams) {
                 }
 
                 const usesDarkDefense = plan.kind === 'darkAttack' || action.defenseType === 'dark';
-                const defenseMethod = usesDarkDefense && typeof target.char.darkDefend === 'function'
-                    ? 'darkDefend'
-                    : 'defend';
-                const defense = typeof target.char[defenseMethod] === 'function'
-                    ? target.char[defenseMethod]()
-                    : { msg: `${safeName(target)} kann sich nicht verteidigen.`, damage: 0, valid: true };
+                const defenseMethod =
+                    usesDarkDefense && typeof target.char.darkDefend === 'function' ? 'darkDefend' : 'defend';
+                const defense =
+                    typeof target.char[defenseMethod] === 'function'
+                        ? target.char[defenseMethod]()
+                        : { msg: `${safeName(target)} kann sich nicht verteidigen.`, damage: 0, valid: true };
 
                 printActionMessage(defense);
                 printResult(target.char.calcDamage(action, defense));
@@ -1059,9 +1086,13 @@ function printWinner(result) {
     console.log(`\n${formatHeading('===== Ergebnis =====')}`);
 
     if (result === PLAYER) {
-        console.log(chalk.green.bold('Der Spieler gewinnt. Alle gegnerischen Einheiten sind besiegt.'));
+        console.log(
+            chalk.green.bold(`Der Spieler gewinnt. Alle gegnerischen Einheiten sind nach ${viewState.round} besiegt.`),
+        );
     } else if (result === ENEMY) {
-        console.log(chalk.red.bold('Der Spieler verliert. Alle eigenen Einheiten sind besiegt.'));
+        console.log(
+            chalk.red.bold(`Der Spieler verliert. Alle eigenen Einheiten sind nach ${viewState.round} runden besiegt.`),
+        );
     } else {
         console.log(chalk.yellow.bold('Unentschieden. Beide Seiten wurden besiegt.'));
     }
@@ -1129,7 +1160,7 @@ async function runBattle(rl, teams) {
         round++;
     }
 
-    printWinner(winner(teams));
+    printWinner(winner(teams), viewState);
 }
 
 export async function runBattleSimulator() {

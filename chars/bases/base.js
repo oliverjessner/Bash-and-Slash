@@ -1,0 +1,433 @@
+const baseLimit = 390;
+const ouputLuckActions = true;
+
+export default class base {
+    _nickname = '';
+    _name = '';
+    _hp = 0;
+    _fullHP = 0;
+    _atk = 0;
+    _baseAtk = 0;
+    _def = 0;
+    _baseDef = 0;
+    _int = 0;
+    _baseInt = 0;
+    _dakt = 0;
+    _baseDakt = 0;
+    _ddef = 0;
+    _baseDdef = 0;
+    _mana = 0;
+    _fullMana = 0;
+    _luck = 0;
+    _range = 0;
+    _skills = [];
+    _status = ['healthy'];
+    static minManaUsage = 20;
+    #usedLuck = 0;
+    static #id = 0;
+
+    constructor({
+        nickname = '',
+        name,
+        hp,
+        atk = 20,
+        def = 10,
+        int = 60,
+        dakt = 0,
+        ddef = 10,
+        mana = 0,
+        luck = 1,
+        range = 1,
+        skills = [],
+    }) {
+        base.#id++;
+        this._nickname = nickname || `${name}_${base.#id}`;
+        this._name = name;
+        this._fullHP = hp;
+        this._hp = hp;
+        this._atk = atk;
+        this._baseAtk = atk;
+        this._def = def;
+        this._baseDef = def;
+        this._int = int;
+        this._baseInt = int;
+        this._dakt = dakt;
+        this._baseDakt = dakt;
+        this._ddef = ddef;
+        this._baseDdef = ddef;
+        this._mana = mana;
+        this._fullMana = mana;
+        this._luck = luck;
+        this._range = range;
+        this._skills = skills;
+        this.check();
+    }
+
+    check() {
+        const base = this._hp + this._atk + this._def + this._int + this._dakt + this._ddef + this._mana;
+        const secBase = this._luck + this._range;
+
+        if (secBase > 5) {
+            console.warn(
+                `Warning: ${this._name} has a secondary base stat of ${secBase}, which is above the recommended limit of 5. Consider adjusting the stats to maintain game balance.`,
+            );
+        }
+        if (base > baseLimit) {
+            console.warn(
+                `Warning: ${this._name} has a base stat of ${base}, which is above the recommended limit of 390. Consider adjusting the stats to maintain game balance.`,
+            );
+        }
+    }
+
+    welformAction(obj) {
+        if (!obj.hasOwnProperty('valid')) {
+            console.log(obj);
+            throw new Error('Action object must have a valid property.', obj);
+        }
+        if (!obj.hasOwnProperty('msg')) {
+            console.log(obj);
+            throw new Error('Action object must have a msg property.', obj);
+        }
+        if (obj.hasOwnProperty('action')) {
+            console.log(obj);
+            throw new Error('Action object must not have an action property.', obj);
+        }
+
+        return {
+            from: base.#id,
+            ...obj,
+        };
+    }
+
+    getName() {
+        return {
+            name: this._name,
+            nickname: this._nickname,
+        };
+    }
+
+    #enoughLuck() {
+        const rand = Math.random() * 100;
+        const luck = this._luck * 2;
+        const enoughLuck = rand < luck;
+
+        if (enoughLuck) {
+            this.#usedLuck++;
+        }
+
+        return enoughLuck;
+    }
+
+    luckOutput(msg) {
+        if (ouputLuckActions) {
+            console.log(`[LUCK] ${this._name}: ${msg}`);
+        }
+    }
+
+    getInt() {
+        if (this.#enoughLuck()) {
+            this.luckOutput('int');
+            return this.welformAction({ msg: 'Luck is on your side!', int: this._int + 5, valid: true });
+        }
+
+        return this.welformAction({ msg: 'No luck this time.', int: this._int, valid: true });
+    }
+
+    darkAttack(alternativeMsg = 'Dark attack!') {
+        return this.attack(alternativeMsg, '_dakt');
+    }
+
+    attack(alternativeMsg = 'Normal hit.', damageType = '_atk') {
+        if (this.#enoughLuck()) {
+            this.luckOutput('atk');
+            return [
+                this.welformAction({
+                    msg: `${alternativeMsg} - Critical hit!`,
+                    damage: this[damageType] * 2,
+                    triggers: 'calcDamage',
+                    valid: true,
+                }),
+            ];
+        }
+
+        return [
+            this.welformAction({
+                msg: alternativeMsg,
+                damage: this[damageType],
+                triggers: 'calcDamage',
+                valid: true,
+            }),
+        ];
+    }
+
+    darkDefend(alternativeMsg = 'Dark defense!') {
+        return this.defend(alternativeMsg, '_ddef');
+    }
+
+    defend(alternativeMsg = 'Normal defense.', damageType = '_def') {
+        if (this.#enoughLuck()) {
+            this.luckOutput('def');
+            return this.welformAction({
+                msg: `${alternativeMsg} Critical defense!`,
+                damage: this[damageType] * 2,
+                triggers: 'calcDamage',
+                valid: true,
+            });
+        }
+
+        return this.welformAction({
+            msg: alternativeMsg,
+            damage: this[damageType],
+            triggers: 'calcDamage',
+            valid: true,
+        });
+    }
+
+    calcDamage(attack, defense) {
+        const damage = Math.floor(attack.damage - defense.damage);
+
+        if (this._status.includes('invulnerable')) {
+            return this.welformAction({
+                msg: `${this._name} is invulnerable!`,
+                damage: 0,
+                valid: true,
+            });
+        }
+
+        this._hp -= damage;
+
+        if (this._hp <= 0) {
+            return this.welformAction({
+                msg: `${this._name} has been defeated!`,
+                hp: 0,
+                valid: true,
+            });
+        }
+
+        return this.welformAction({
+            msg: `${this._name} takes ${damage} damage.`,
+            hp: this._hp,
+            valid: true,
+        });
+    }
+
+    isDead() {
+        return this._hp <= 0;
+    }
+
+    buff({ buff: { type, amount, selfBuff }, from }) {
+        if (selfBuff && from !== base.#id) {
+            return this.welformAction({
+                msg: `Buff failed. ${this._name} can only buff itself.`,
+                valid: false,
+            });
+        }
+
+        if (this.hasOwnProperty(`_${type}`)) {
+            this[`_${type}`] += amount;
+
+            return this.welformAction({
+                msg: `${this._name}'s ${type} has been increased by ${amount}.`,
+                valid: true,
+            });
+        }
+    }
+
+    defbuff({ buff: { type, amount } }) {
+        if (this.hasOwnProperty(`_${type}`)) {
+            this[`_${type}`] += amount;
+
+            return this.welformAction({
+                msg: `${this._name}'s ${type} has been increased by ${amount}.`,
+                valid: true,
+            });
+        }
+    }
+
+    isAbleToUseSkill() {
+        return this._mana >= this.minManaUsage;
+    }
+
+    getSkills() {
+        return {
+            skills: this._skills,
+            isAbleToUseSkill: this.isAbleToUseSkill(),
+        };
+    }
+
+    activateStatusOnChar() {
+        if (this._status.includes('healthy')) {
+            return this.welformAction({
+                msg: `${this._name} is healthy.`,
+                status: this._status,
+                valid: true,
+            });
+        }
+
+        this._status.forEach(element => {
+            if (element === 'poisoned' && !this._status.includes('invulnerable')) {
+                this._hp -= 5;
+            }
+            if (element === 'invulnerable') {
+                this._status = this._status.filter(status => status !== 'invulnerable');
+            }
+            if (element === 'asleep') {
+                this._status = this._status.filter(status => status !== 'asleep');
+            }
+            if (element === 'frozen' && this._int > this._baseInt / 2) {
+                this._int = this._int / 2;
+            }
+            if (element === 'burned' && this._def > this._baseDeff - this._baseDef / 3) {
+                this._def = this._def - this._def / 3;
+            }
+            if (element === 'entangled' && this._atk > this._baseAtk - this._baseAtk / 4) {
+                this._atk = this._atk - this._atk / 4;
+            }
+        });
+
+        if (this.isDead()) {
+            return this.welformAction({
+                msg: `${this._name} has been defeated by status effects!`,
+                hp: 0,
+                status: this._status,
+                valid: true,
+            });
+        }
+
+        return this.welformAction({
+            msg: `${this._name} is ${this._status.join(', ')}.`,
+            status: this._status,
+            valid: true,
+        });
+    }
+
+    isAbleToDoAction() {
+        if (this._status.includes('asleep')) {
+            return this.welformAction({
+                msg: `${this._name} is asleep and misses the turn!`,
+                valid: false,
+            });
+        }
+
+        return this.welformAction({
+            msg: `${this._name} is able to act.`,
+            valid: true,
+        });
+    }
+
+    changeStatus(newStatus) {
+        const isAlreadyStatus = this._status.includes(newStatus);
+
+        if (isAlreadyStatus) {
+            return this.welformAction({
+                msg: `${this._name} is already ${newStatus}.`,
+                status: this._status,
+                valid: false,
+            });
+        }
+
+        this._status.push(newStatus);
+        this._status = this._status.filter(status => status !== 'healthy');
+
+        return this.welformAction({
+            msg: `${this._name} is now ${newStatus}.`,
+            status: this._status,
+            valid: true,
+        });
+    }
+
+    reciveHealing({ heal, selfAction, from }) {
+        this._hp += heal;
+
+        if (selfAction && base.#id !== from) {
+            return this.welformAction({
+                msg: `Healing failed. ${this._name} can only heal itself.`,
+                hp: this._hp,
+                valid: false,
+            });
+        }
+        if (this._hp > this._fullHP) {
+            this._hp = this._fullHP;
+        }
+
+        return this.welformAction({
+            msg: `${this._name} heals for ${heal} HP.`,
+            hp: this._hp,
+            valid: true,
+        });
+    }
+
+    reciveMana({ mana, selfAction, from }) {
+        this._mana += mana;
+
+        if (selfAction && base.#id !== from) {
+            return this.welformAction({
+                msg: `Mana healing failed. ${this._name} can only heal itself.`,
+                hp: this._hp,
+                valid: false,
+            });
+        }
+        if (this._mana > this._fullMana) {
+            this._mana = this._fullMana;
+        }
+
+        return this.welformAction({
+            msg: `${this._name} recovers ${mana} mana.`,
+            mana: this._mana,
+            valid: true,
+        });
+    }
+
+    drainMana({ mana }) {
+        this._mana -= mana;
+
+        if (this._mana < 0) {
+            this._mana = 0;
+        }
+
+        return this.welformAction({
+            msg: `${this._name} loses ${mana} mana.`,
+            mana: this._mana,
+            valid: true,
+        });
+    }
+
+    triggerVitality() {
+        this._status = ['healthy'];
+    }
+
+    reset() {
+        this._hp = this._fullHP;
+        this.triggerVitality();
+        this.#usedLuck = 0;
+    }
+
+    toString() {
+        const BASE = this._fullHP + this._atk + this._def + this._int + this._dakt + this._ddef + this._mana;
+
+        return {
+            name: this._name,
+            stylizedHP: this._hp + '/' + this._fullHP,
+            hp: this._hp,
+            fullHP: this._fullHP,
+            atk: this._atk,
+            baseAtk: this._baseAtk,
+            DEF: this._def,
+            baseDef: this._baseDef,
+            INT: this._int,
+            baseInt: this._baseInt,
+            DAKT: this._dakt,
+            baseDakt: this._baseDakt,
+            DDEF: this._ddef,
+            baseDdef: this._baseDdef,
+            MANA: this._mana,
+            fullMana: this._fullMana,
+            LUCK: this._luck,
+            RANGE: this._range,
+            UsedLuck: this.#usedLuck,
+            ID: base.#id,
+            skills: this._skills,
+            BASE,
+        };
+    }
+}

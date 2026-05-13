@@ -8,7 +8,7 @@ export default class enchanter extends buffer {
             atk: 20,
             def: 15,
             int: 90,
-            ddef: 30,
+            ddef: 25,
             mana: 160,
             luck: 1,
             range: 4,

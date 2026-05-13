@@ -4,7 +4,7 @@ export default class firegolem extends golem {
     constructor() {
         super({
             name: 'firegolem',
-            skills: ['fireBreath', 'fireShards', 'fireball'],
+            skills: ['fireBreath', 'fireShards', 'fireBall'],
         });
     }
 

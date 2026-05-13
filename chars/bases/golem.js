@@ -19,11 +19,17 @@ export default class golem extends base {
         if (this._mana >= this.minManaUsage) {
             this._mana -= this.minManaUsage;
         } else {
-            return this.welformAction({ mana: this._mana, msg: 'Not enough mana for ball.', valid: false });
+            return this.welformAction({
+                emoji: '🎾',
+                mana: this._mana,
+                msg: 'Not enough mana for ball.',
+                valid: false,
+            });
         }
 
         return this.welformAction({
             msg,
+            emoji: '🎾',
             damage: 40,
             triggers: 'calcDamage',
             valid: true,
@@ -37,6 +43,7 @@ export default class golem extends base {
             attacks.push(
                 this.welformAction({
                     msg,
+                    emoji: '☄️',
                     damage,
                     triggers: 'calcDamage',
                     valid: true,
@@ -47,7 +54,12 @@ export default class golem extends base {
         if (this._mana >= this.minManaUsage + extraMana) {
             this._mana -= this.minManaUsage + extraMana;
         } else {
-            return this.welformAction({ mana: this._mana, msg: 'Not enough mana for shards.', valid: false });
+            return this.welformAction({
+                emoji: '☄️',
+                mana: this._mana,
+                msg: 'Not enough mana for shards.',
+                valid: false,
+            });
         }
 
         return attacks;
@@ -57,11 +69,17 @@ export default class golem extends base {
         if (this._mana >= this.minManaUsage + 20) {
             this._mana -= this.minManaUsage + 20;
         } else {
-            return this.welformAction({ mana: this._mana, msg: 'Not enough mana for breath.', valid: false });
+            return this.welformAction({
+                mana: this._mana,
+                msg: 'Not enough mana for breath.',
+                emoji: '🗣️',
+                valid: false,
+            });
         }
 
         return this.welformAction({
             msg,
+            emoji: '🗣️',
             status,
             triggers: 'changeStatus',
             valid: true,

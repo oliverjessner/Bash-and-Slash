@@ -20,11 +20,17 @@ export default class wizzard extends base {
         if (this._mana >= this.minManaUsage) {
             this._mana -= this.minManaUsage;
         } else {
-            return this.welformAction({ mana: this._mana, msg: 'Not enough mana for sleep.', valid: false });
+            return this.welformAction({
+                emoji: '💤',
+                mana: this._mana,
+                msg: 'Not enough mana for sleep.',
+                valid: false,
+            });
         }
 
         return this.welformAction({
             msg: 'Sleep! Target falls asleep.',
+            emoji: '💤',
             status: 'asleep',
             triggers: 'changeStatus',
             valid: true,
@@ -35,11 +41,17 @@ export default class wizzard extends base {
         if (this._mana >= this.minManaUsage) {
             this._mana -= this.minManaUsage;
         } else {
-            return this.welformAction({ mana: this._mana, msg: 'Not enough mana for mana drain.', valid: false });
+            return this.welformAction({
+                emoji: '🧙🏻‍♀️',
+                mana: this._mana,
+                msg: 'Not enough mana for mana drain.',
+                valid: false,
+            });
         }
 
         return this.welformAction({
             msg: 'Mana drain! Target loses 20 mana.',
+            emoji: '🧙🏻‍♀️',
             mana: 20,
             triggers: 'manaDrain',
             valid: true,
@@ -50,11 +62,17 @@ export default class wizzard extends base {
         if (this._mana >= this.minManaUsage) {
             this._mana -= this.minManaUsage;
         } else {
-            return this.welformAction({ mana: this._mana, msg: 'Not enough mana for invulnerability.', valid: false });
+            return this.welformAction({
+                emoji: '🔰',
+                mana: this._mana,
+                msg: 'Not enough mana for invulnerability.',
+                valid: false,
+            });
         }
 
         return this.welformAction({
             msg: 'Invulnerability! Target becomes invulnerable for 1 turn.',
+            emoji: '🔰',
             status: 'invulnerable',
             triggers: 'changeStatus',
             valid: true,

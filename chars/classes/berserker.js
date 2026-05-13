@@ -25,6 +25,7 @@ export default class berserker extends base {
 
         return this.welformAction({
             msg: `atk buff! 5.`,
+            emoji: '📈',
             debuff: {
                 type: 'atk',
                 amount: 5,

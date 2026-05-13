@@ -1,5 +1,4 @@
 const baseLimit = 390;
-const ouputLuckActions = true;
 
 export default class base {
     _nickname = '';
@@ -92,6 +91,10 @@ export default class base {
             console.log(obj);
             throw new Error('Action object must not have an action property.', obj);
         }
+        if (!obj.hasOwnProperty('emoji')) {
+            console.log(obj);
+            throw new Error('Action object must have an emoji property.', obj);
+        }
 
         return {
             from: base.#id,
@@ -118,19 +121,12 @@ export default class base {
         return enoughLuck;
     }
 
-    luckOutput(msg) {
-        if (ouputLuckActions) {
-            console.log(`[LUCK] ${this._name}: ${msg}`);
-        }
-    }
-
     getInt() {
         if (this.#enoughLuck()) {
-            this.luckOutput('int');
-            return this.welformAction({ msg: 'Luck is on your side!', int: this._int + 5, valid: true });
+            return this.welformAction({ emoji: '👟', msg: 'Luck is on your side!', int: this._int + 5, valid: true });
         }
 
-        return this.welformAction({ msg: 'No luck this time.', int: this._int, valid: true });
+        return this.welformAction({ emoji: '👟', msg: 'No luck this time.', int: this._int, valid: true });
     }
 
     darkAttack(alternativeMsg = 'Dark attack!') {
@@ -139,10 +135,10 @@ export default class base {
 
     attack(alternativeMsg = 'Normal hit.', damageType = '_atk') {
         if (this.#enoughLuck()) {
-            this.luckOutput('atk');
             return [
                 this.welformAction({
                     msg: `${alternativeMsg} - Critical hit!`,
+                    emoji: '⚔️',
                     damage: this[damageType] * 2,
                     triggers: 'calcDamage',
                     valid: true,
@@ -153,6 +149,7 @@ export default class base {
         return [
             this.welformAction({
                 msg: alternativeMsg,
+                emoji: '⚔️',
                 damage: this[damageType],
                 triggers: 'calcDamage',
                 valid: true,
@@ -166,9 +163,9 @@ export default class base {
 
     defend(alternativeMsg = 'Normal defense.', damageType = '_def') {
         if (this.#enoughLuck()) {
-            this.luckOutput('def');
             return this.welformAction({
-                msg: `${alternativeMsg} Critical defense!`,
+                msg: `${alternativeMsg} Critical defense!`,
+                emoji: '🛡️',
                 damage: this[damageType] * 2,
                 triggers: 'calcDamage',
                 valid: true,
@@ -177,6 +174,7 @@ export default class base {
 
         return this.welformAction({
             msg: alternativeMsg,
+            emoji: '🛡️',
             damage: this[damageType],
             triggers: 'calcDamage',
             valid: true,
@@ -189,7 +187,17 @@ export default class base {
         if (this._status.includes('invulnerable')) {
             return this.welformAction({
                 msg: `${this._name} is invulnerable!`,
+                emoji: '🧮',
                 damage: 0,
+                valid: true,
+            });
+        }
+
+        if (damage < 0) {
+            return this.welformAction({
+                msg: `${this._name} takes no damage.`,
+                emoji: '🧮',
+                hp: this._hp,
                 valid: true,
             });
         }
@@ -199,6 +207,7 @@ export default class base {
         if (this._hp <= 0) {
             return this.welformAction({
                 msg: `${this._name} has been defeated!`,
+                emoji: '🧮',
                 hp: 0,
                 valid: true,
             });
@@ -206,6 +215,7 @@ export default class base {
 
         return this.welformAction({
             msg: `${this._name} takes ${damage} damage.`,
+            emoji: '🧮',
             hp: this._hp,
             valid: true,
         });
@@ -219,6 +229,7 @@ export default class base {
         if (selfBuff && from !== base.#id) {
             return this.welformAction({
                 msg: `Buff failed. ${this._name} can only buff itself.`,
+                emoji: '📈',
                 valid: false,
             });
         }
@@ -228,6 +239,7 @@ export default class base {
 
             return this.welformAction({
                 msg: `${this._name}'s ${type} has been increased by ${amount}.`,
+                emoji: '📈',
                 valid: true,
             });
         }
@@ -235,10 +247,15 @@ export default class base {
 
     defbuff({ buff: { type, amount } }) {
         if (this.hasOwnProperty(`_${type}`)) {
-            this[`_${type}`] += amount;
+            this[`_${type}`] -= amount;
+
+            if (this[`_${type}`] < 0) {
+                this[`_${type}`] = 0;
+            }
 
             return this.welformAction({
-                msg: `${this._name}'s ${type} has been increased by ${amount}.`,
+                msg: `${this._name}'s ${type} has been decreased by ${amount}.`,
+                emoji: '📉',
                 valid: true,
             });
         }
@@ -256,9 +273,10 @@ export default class base {
     }
 
     activateStatusOnChar() {
-        if (this._status.includes('healthy')) {
+        if (this._status.includes('healthy') || this._status.includes('invulnerable')) {
             return this.welformAction({
                 msg: `${this._name} is healthy.`,
+                emoji: '🧬',
                 status: this._status,
                 valid: true,
             });
@@ -288,6 +306,7 @@ export default class base {
         if (this.isDead()) {
             return this.welformAction({
                 msg: `${this._name} has been defeated by status effects!`,
+                emoji: '🥚',
                 hp: 0,
                 status: this._status,
                 valid: true,
@@ -296,6 +315,7 @@ export default class base {
 
         return this.welformAction({
             msg: `${this._name} is ${this._status.join(', ')}.`,
+            emoji: '🥚',
             status: this._status,
             valid: true,
         });
@@ -305,12 +325,14 @@ export default class base {
         if (this._status.includes('asleep')) {
             return this.welformAction({
                 msg: `${this._name} is asleep and misses the turn!`,
+                emoji: '💤',
                 valid: false,
             });
         }
 
         return this.welformAction({
             msg: `${this._name} is able to act.`,
+            emoji: '🏁',
             valid: true,
         });
     }
@@ -321,16 +343,21 @@ export default class base {
         if (isAlreadyStatus) {
             return this.welformAction({
                 msg: `${this._name} is already ${newStatus}.`,
+                emoji: '🚫',
                 status: this._status,
                 valid: false,
             });
         }
 
         this._status.push(newStatus);
-        this._status = this._status.filter(status => status !== 'healthy');
+
+        if (newStatus !== 'invulnerable') {
+            this._status = this._status.filter(status => status !== 'healthy');
+        }
 
         return this.welformAction({
             msg: `${this._name} is now ${newStatus}.`,
+            emoji: '↔️',
             status: this._status,
             valid: true,
         });
@@ -342,6 +369,7 @@ export default class base {
         if (selfAction && base.#id !== from) {
             return this.welformAction({
                 msg: `Healing failed. ${this._name} can only heal itself.`,
+                emoji: '❤️‍🩹',
                 hp: this._hp,
                 valid: false,
             });
@@ -352,6 +380,7 @@ export default class base {
 
         return this.welformAction({
             msg: `${this._name} heals for ${heal} HP.`,
+            emoji: '💊',
             hp: this._hp,
             valid: true,
         });
@@ -363,6 +392,7 @@ export default class base {
         if (selfAction && base.#id !== from) {
             return this.welformAction({
                 msg: `Mana healing failed. ${this._name} can only heal itself.`,
+                emoji: '🪄',
                 hp: this._hp,
                 valid: false,
             });
@@ -373,6 +403,7 @@ export default class base {
 
         return this.welformAction({
             msg: `${this._name} recovers ${mana} mana.`,
+            emoji: '🪄',
             mana: this._mana,
             valid: true,
         });
@@ -387,6 +418,7 @@ export default class base {
 
         return this.welformAction({
             msg: `${this._name} loses ${mana} mana.`,
+            emoji: '🧙🏻‍♀️',
             mana: this._mana,
             valid: true,
         });

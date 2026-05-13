@@ -16,6 +16,8 @@ export default class knight extends base {
     }
 
     defdebuff() {
+        const debuffAmount = 5;
+
         if (this._mana >= this.minManaUsage) {
             this._mana -= this.minManaUsage;
         } else {
@@ -23,10 +25,11 @@ export default class knight extends base {
         }
 
         return this.welformAction({
-            msg: `Defensive debuff! Enemy defense reduced by ${this._ddef} for the next attack.`,
+            msg: `Defensive debuff! Enemy defense reduced by ${debuffAmount} for the next attack.`,
+            emoji: '📉',
             debuff: {
                 type: 'def',
-                amount: 5,
+                amount: debuffAmount,
             },
             mana: this._mana,
             triggers: 'debuff',

@@ -21,11 +21,17 @@ export default class knight extends base {
         if (this._mana >= this.minManaUsage) {
             this._mana -= this.minManaUsage;
         } else {
-            return this.welformAction({ mana: this._mana, msg: 'Not enough mana for self heal.', valid: false });
+            return this.welformAction({
+                emoji: '🏥',
+                mana: this._mana,
+                msg: 'Not enough mana for self heal.',
+                valid: false,
+            });
         }
 
         return this.welformAction({
             msg: `Self heal! Restored ${selfHealAmount} HP.`,
+            emoji: '🏥',
             heal: selfHealAmount,
             mana: this._mana,
             triggers: 'reciveHealing',

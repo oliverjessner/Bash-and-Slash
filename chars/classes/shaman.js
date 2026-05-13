@@ -25,6 +25,7 @@ export default class shaman extends healer {
 
         return {
             msg: 'Vitality! for one character.',
+            emoji: '💉',
             triggers: 'triggerVitality',
             valid: true,
         };
@@ -42,6 +43,7 @@ export default class shaman extends healer {
         return this.welformAction({
             msg: `Mana heal! Restored ${manaHealAmount} mana.`,
             manaHeal: manaHealAmount,
+            emoji: '🪄',
             mana: this._mana,
             triggers: 'manaHeal',
             valid: true,

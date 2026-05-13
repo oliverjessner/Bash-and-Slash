@@ -26,6 +26,7 @@ export default class archer extends base {
 
         return this.welformAction({
             msg: 'Poison arrow! 5 hp down every turn',
+            emoji: '🍄',
             status: 'poisoned',
             triggers: 'changeStatus',
             valid: true,

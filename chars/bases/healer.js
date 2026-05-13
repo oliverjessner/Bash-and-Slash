@@ -17,6 +17,7 @@ export default class healer extends base {
 
         return this.welformAction({
             msg: `heal! ${healAmount} HP.`,
+            emoji: '🏥',
             heal: healAmount,
             mana: this._mana,
             triggers: 'reciveHealing',

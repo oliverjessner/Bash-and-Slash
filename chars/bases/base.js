@@ -137,7 +137,7 @@ export default class base {
         if (this.#enoughLuck()) {
             return [
                 this.welformAction({
-                    msg: `${alternativeMsg} - Critical hit!`,
+                    msg: `${alternativeMsg} - Critical hit! - ${this[damageType]}`,
                     emoji: '⚔️',
                     damage: this[damageType] * 2,
                     triggers: 'calcDamage',
@@ -148,7 +148,7 @@ export default class base {
 
         return [
             this.welformAction({
-                msg: alternativeMsg,
+                msg: alternativeMsg + ` - ${this[damageType]}`,
                 emoji: '⚔️',
                 damage: this[damageType],
                 triggers: 'calcDamage',

@@ -11,6 +11,10 @@ import classesData from './chars/classesdata.js';
 
 const PLAYER = 'player';
 const ENEMY = 'enemy';
+const DEFAULT_TEAM_NAMES = {
+    [PLAYER]: 'Spieler',
+    [ENEMY]: 'CPU',
+};
 const DEFAULT_MIN_MANA_USAGE = 20;
 const NAME_COLUMN_WIDTH = 28;
 const VALUE_COLUMN_WIDTH = 10;
@@ -145,6 +149,17 @@ function otherSide(side) {
     return side === PLAYER ? ENEMY : PLAYER;
 }
 
+function normalizeTeamNames(teamNames = {}) {
+    return {
+        [PLAYER]: String(teamNames[PLAYER] || DEFAULT_TEAM_NAMES[PLAYER]).trim() || DEFAULT_TEAM_NAMES[PLAYER],
+        [ENEMY]: String(teamNames[ENEMY] || DEFAULT_TEAM_NAMES[ENEMY]).trim() || DEFAULT_TEAM_NAMES[ENEMY],
+    };
+}
+
+function teamName(teamNames, side) {
+    return teamNames?.[side] ?? DEFAULT_TEAM_NAMES[side] ?? side;
+}
+
 function safeToString(unit) {
     try {
         return typeof unit.char.toString === 'function' ? unit.char.toString() : {};
@@ -209,6 +224,48 @@ function unitDef(unit) {
     const def = Number(data.DEF ?? data.def ?? unit.char?._def);
 
     return Number.isFinite(def) ? def : 0;
+}
+
+function unitDarkAtk(unit) {
+    const data = safeToString(unit);
+    const darkAtk = Number(data.DATK ?? data.datk ?? unit.char?._datk);
+
+    return Number.isFinite(darkAtk) ? darkAtk : 0;
+}
+
+function unitDarkDef(unit) {
+    const data = safeToString(unit);
+    const darkDef = Number(data.DDEF ?? data.ddef ?? unit.char?._ddef);
+
+    return Number.isFinite(darkDef) ? darkDef : 0;
+}
+
+function estimateAttackDamage(actor, target, { dark = false } = {}) {
+    if (!actor || !target || unitStatus(target).includes('invulnerable')) {
+        return 0;
+    }
+
+    const attack = dark ? unitDarkAtk(actor) : unitAtk(actor);
+    const defense = dark ? unitDarkDef(target) : unitDef(target);
+
+    return Math.max(0, Math.floor(attack - defense));
+}
+
+function isDarkAttackStronger(actor, target) {
+    return estimateAttackDamage(actor, target, { dark: true }) > estimateAttackDamage(actor, target);
+}
+
+function switchWeakDarkAttackToNormal(plan) {
+    if (plan.kind !== 'darkAttack' || isDarkAttackStronger(plan.actor, plan.target)) {
+        return false;
+    }
+
+    plan.kind = 'attack';
+    plan.skillName = null;
+    plan.skillMethod = null;
+    plan.targetScope = inferTargetScope(plan.actor, plan.kind, plan.skillName);
+
+    return true;
 }
 
 function unitInt(unit) {
@@ -327,12 +384,14 @@ function printRoundOrder(roundOrder) {
 }
 
 function printBattleState(round, teams, roundOrder) {
+    const teamNames = teams.teamNames;
+
     console.log(formatHeading(`===== Runde ${round} =====`));
     printRoundOrder(roundOrder);
     console.log('');
-    printTeam('Eigene Einheiten:', teams.player);
+    printTeam(`${teamName(teamNames, PLAYER)} Einheiten:`, teams.player);
     console.log('');
-    printTeam('Gegnerische Einheiten:', teams.enemy);
+    printTeam(`${teamName(teamNames, ENEMY)} Einheiten:`, teams.enemy);
 }
 
 function printChosenActions(plans) {
@@ -405,9 +464,9 @@ async function askClassName(rl, question) {
     }
 }
 
-async function chooseUnits(rl, side) {
-    const label = side === PLAYER ? 'eigene' : 'gegnerische';
-    const amount = await askPositiveInteger(rl, `\nWie viele ${label} Einheiten? `);
+async function chooseUnits(rl, side, teamNames) {
+    const label = teamName(teamNames, side);
+    const amount = await askPositiveInteger(rl, `\nWie viele Einheiten fuer ${label}? `);
     const units = [];
 
     for (let index = 1; index <= amount; index++) {
@@ -735,7 +794,7 @@ function chooseAiAction(teams, unit, sequence) {
     const scope = inferTargetScope(unit, kind, skillName);
     const target = randomItem(targetCandidates(teams, unit, scope));
 
-    return {
+    const plan = {
         actor: unit,
         kind,
         skillName,
@@ -744,6 +803,10 @@ function chooseAiAction(teams, unit, sequence) {
         targetScope: scope,
         sequence,
     };
+
+    switchWeakDarkAttackToNormal(plan);
+
+    return plan;
 }
 
 function getInitiative(unit) {
@@ -785,13 +848,21 @@ function describePlan(plan) {
     return `${formatUnitName(plan.actor, { padded: false })} ${action}${target}`;
 }
 
-async function collectRoundPlans(rl, teams, roundOrder, viewState) {
+function isCpuControlled(unit, options) {
+    return options.cpuControlledSides.includes(unit.side);
+}
+
+async function collectRoundPlans(rl, teams, roundOrder, viewState, options) {
     const plans = [];
     let sequence = 0;
 
     for (const unit of livingUnits(teams.player)) {
         viewState.chosenPlans = plans;
-        plans.push(await askPlayerAction(rl, teams, unit, sequence++, viewState));
+        plans.push(
+            isCpuControlled(unit, options)
+                ? chooseAiAction(teams, unit, sequence++)
+                : await askPlayerAction(rl, teams, unit, sequence++, viewState),
+        );
         viewState.chosenPlans = plans;
         renderScreen(viewState);
     }
@@ -1083,11 +1154,13 @@ function canAct(unit) {
     return result?.valid !== false;
 }
 
-function executePlan(plan, teams) {
+function executePlan(plan, teams, options) {
     if (!isAlive(plan.actor)) {
         console.log(`\n> ${plan.actor.id} ${safeName(plan.actor)} ist tot und kann nicht handeln.`);
         return;
     }
+
+    let replacementMessage = null;
 
     if (plan.target && !isAlive(plan.target)) {
         const replacement = findReplacementTarget(teams, plan);
@@ -1098,10 +1171,21 @@ function executePlan(plan, teams) {
             return;
         }
 
-        console.log(`\n> Ziel ${plan.target.id} ist tot. Neues Ziel: ${replacement.id} ${safeName(replacement)}`);
+        replacementMessage = `Ziel ${plan.target.id} ist tot. Neues Ziel: ${replacement.id} ${safeName(replacement)}`;
         plan.target = replacement;
+    }
+
+    const switchedAttack = isCpuControlled(plan.actor, options) ? switchWeakDarkAttackToNormal(plan) : false;
+
+    if (replacementMessage) {
+        console.log(`\n> ${replacementMessage}`);
+        console.log(`  ${describePlan(plan)}`);
     } else {
         console.log(`\n> ${describePlan(plan)}`);
+    }
+
+    if (switchedAttack) {
+        console.log('  KI wechselt auf normalen Angriff, weil Dark Attack nicht mehr Schaden verursacht.');
     }
 
     if (!canAct(plan.actor)) {
@@ -1160,16 +1244,20 @@ function winner(teams) {
     return 'draw';
 }
 
-function printWinner(result, round) {
+function printWinner(result, round, teamNames) {
     console.log(`\n${formatHeading('===== Ergebnis =====')}`);
 
     if (result === PLAYER) {
         console.log(
-            chalk.green.bold(`Der Spieler gewinnt. Alle gegnerischen Einheiten sind nach ${round - 1} besiegt.`),
+            chalk.green.bold(
+                `${teamName(teamNames, PLAYER)} gewinnt. ${teamName(teamNames, ENEMY)} ist nach ${round - 1} Runden besiegt.`,
+            ),
         );
     } else if (result === ENEMY) {
         console.log(
-            chalk.red.bold(`Der Spieler verliert. Alle eigenen Einheiten sind nach ${round - 1} runden besiegt.`),
+            chalk.red.bold(
+                `${teamName(teamNames, ENEMY)} gewinnt. ${teamName(teamNames, PLAYER)} ist nach ${round - 1} Runden besiegt.`,
+            ),
         );
     } else {
         console.log(chalk.yellow.bold('Unentschieden. Beide Seiten wurden besiegt.'));
@@ -1199,7 +1287,7 @@ async function confirmNextRound(rl, nextRound, viewState) {
     await rl.question(chalk.gray(`Enter druecken fuer Runde ${nextRound}...`));
 }
 
-async function runBattle(rl, teams) {
+async function runBattle(rl, teams, options) {
     let round = 1;
 
     while (!winner(teams)) {
@@ -1214,14 +1302,14 @@ async function runBattle(rl, teams) {
 
         renderScreen(viewState);
 
-        const plans = await collectRoundPlans(rl, teams, roundOrder, viewState);
+        const plans = await collectRoundPlans(rl, teams, roundOrder, viewState, options);
 
         for (const plan of plans) {
             if (winner(teams)) {
                 break;
             }
 
-            const logLines = captureConsole(() => executePlan(plan, teams));
+            const logLines = captureConsole(() => executePlan(plan, teams, options));
             viewState.executionLog.push(...logLines);
             renderScreen(viewState);
         }
@@ -1229,7 +1317,7 @@ async function runBattle(rl, teams) {
         const statusLines = captureConsole(() => printRoundStatusEffects(teams));
         viewState.executionLog.push(...statusLines);
 
-        if (!winner(teams)) {
+        if (!winner(teams) && options.pauseBetweenRounds) {
             await confirmNextRound(rl, round + 1, viewState);
         } else {
             renderScreen(viewState);
@@ -1238,23 +1326,32 @@ async function runBattle(rl, teams) {
         round++;
     }
 
-    printWinner(winner(teams), round);
+    printWinner(winner(teams), round, teams.teamNames);
 }
 
-export async function runBattleSimulator() {
-    const rl = readline.createInterface({ input, output });
+export async function runBattleSimulator({
+    cpuControlledSides = [ENEMY],
+    pauseBetweenRounds = true,
+    teamNames: requestedTeamNames = DEFAULT_TEAM_NAMES,
+} = {}, existingReadline = null) {
+    const rl = existingReadline ?? readline.createInterface({ input, output });
+    const shouldCloseReadline = !existingReadline;
+    const teamNames = normalizeTeamNames(requestedTeamNames);
 
     try {
         await printClassList();
 
         const teams = {
-            player: await chooseUnits(rl, PLAYER),
-            enemy: await chooseUnits(rl, ENEMY),
+            player: await chooseUnits(rl, PLAYER, teamNames),
+            enemy: await chooseUnits(rl, ENEMY, teamNames),
+            teamNames,
         };
 
-        await runBattle(rl, teams);
+        await runBattle(rl, teams, { cpuControlledSides, pauseBetweenRounds });
     } finally {
-        rl.close();
+        if (shouldCloseReadline) {
+            rl.close();
+        }
     }
 }
 

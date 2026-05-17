@@ -1,10 +1,10 @@
 {
     "type": "module",
-    "version": "0.0.1",
+    "version": "0.1.0",
     "dependencies": {
         "chalk": "^5.6.2"
     },
     "scripts": {
-        "start": "node ./battle-simulator.js"
+        "start": "node ./menu.js"
     }
 }
